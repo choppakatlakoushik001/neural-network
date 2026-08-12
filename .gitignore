@@ -1,0 +1,37 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs -- this project's venv lives at ~/.venvs/neural-network-qec,
+# but keep these patterns in case one is ever created in-tree.
+.venv/
+venv/
+env/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Model artifacts and datasets -- keep large binaries out of git
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.npz
+data/
+checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
