@@ -3,9 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtualenvs -- this project's venv lives at ~/.venvs/neural-network-qec,
-# but keep these patterns in case one is ever created in-tree.
-.venv/
+# Virtualenvs -- this project's venv lives at ~/.venvs/neural-network-qec and
+# .venv here is a SYMLINK to it (so F5 and the tmux runners find the right
+# interpreter). No trailing slash on .venv: a trailing slash matches only real
+# directories, which would leave the symlink itself untracked and committable.
+.venv
 venv/
 env/
 
