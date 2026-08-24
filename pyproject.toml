@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.0",
+    "stim>=1.16.0",
 ]
 
 [project.scripts]

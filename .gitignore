@@ -33,6 +33,13 @@ dist/
 data/
 checkpoints/
 
+# Generated visualization output
+/diagrams/
+
+# Local scratch experiments
+/test.py
+/test_1.py
+
 # OS / editor
 .DS_Store
 Thumbs.db
