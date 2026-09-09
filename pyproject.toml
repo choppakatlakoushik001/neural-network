@@ -6,11 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.0",
+    "pymatching>=2.4.0",
     "stim>=1.16.0",
 ]
-
-[project.scripts]
-qec = "neural_network_qec.cli:main"
 
 [project.optional-dependencies]
 # Installed on demand: `uv sync --extra dev`

@@ -369,3 +369,148 @@ or commands for which no transcript remains.
   remain local and excluded.
 - No source, test, entry-point, staging, commit, or push repair was performed by
   the guarded publication review.
+
+## 2026-08-25 (EDT)
+
+### Portable Stim diagram output
+
+- Added `src/neural_network_qec/viz.py`, a standard-library helper that writes
+  Stim diagram source to timestamped SVG or HTML files and uses platform-aware,
+  best-effort browser opening.
+- Added `circuit_info.circuit_diagram(kind, name)` as the package-level path to
+  the viewer. `QEC_VIZ_NO_OPEN` disables launching, while `QEC_VIZ_DIR` selects
+  the output directory; generated diagrams remain local artifacts.
+
+## 2026-08-30 (EDT)
+
+### Packaging regression coverage
+
+- Removed the stale `qec = "neural_network_qec.cli:main"` entry point because
+  the referenced module no longer exists.
+- Added `tests/test_packaging.py` to import the installed package and load every
+  declared console entry point, preventing another install-time command from
+  silently targeting a missing module.
+
+## 2026-09-01 (EDT)
+
+### Circuit sampling and error-model API expanded
+
+- Expanded `circuit_info` from two to four explicit Stim noise probabilities by
+  adding the after-Clifford depolarization and after-reset flip controls.
+- Changed `sample_detectors` to return detector events and logical observables
+  separately, and added a decomposed detector error model for matching.
+
+## 2026-09-04 (EDT)
+
+### PyMatching baseline and distance sweep
+
+- Declared and locked PyMatching 2.4.0, including its transitive dependencies.
+- Extended `shots.py` into an MWPM baseline experiment. The saved script uses
+  `p = 0.005` for all four noise controls, sweeps distance and rounds together
+  through 3, 5, and 7, samples 1,000,000 shots per point, decodes the detector
+  batches, and reports observable mismatches and logical error rate.
+- One interactive unseeded run shown in the project terminal reported logical
+  error rates of `0.017294`, `0.013957`, and `0.009865` for distances 3, 5, and
+  7 respectively. These are exploratory results, not reproducible benchmarks;
+  the sampler has no seed or uncertainty calculation.
+- The one-probability sweep shows how logical error rate changes with distance
+  at that point, but it does not determine a threshold. A probability sweep and
+  uncertainty-aware analysis remain future work.
+
+### Guarded validation of the saved snapshot
+
+- `uv lock --check` — passed; resolved 21 packages.
+- `uv run pytest -q` — passed; 2 packaging tests.
+- A ten-shot distance-3 API smoke — passed. Detector, observable, and decoded
+  prediction shapes were `(10, 24)`, `(10, 1)`, and `(10, 1)`; a timeline SVG
+  was written with browser opening disabled.
+- `uv run ruff check --no-cache src tests` — failed with two import-order and
+  three line-length findings.
+- `uv run ruff format --check --no-cache src tests` — failed; `circuit.py`,
+  `shots.py`, and `viz.py` would be reformatted.
+- `uv run basedpyright` — failed because `circuit_diagram` accepts an arbitrary
+  `str` while Stim's `diagram` type annotation accepts a fixed literal set.
+- `git diff --check` — failed on trailing whitespace and extra blank lines in
+  `circuit.py` and `shots.py`.
+- The full three-million-shot module run was not repeated during publication
+  review because it is an unseeded, comparatively large experiment. The
+  interactive result above is recorded separately from validation.
+- The `no-mistakes` pipeline was unavailable because this repository has not
+  been initialized for it; no initialization was performed during review.
+- No files were staged, committed, or pushed during this preparation.
+
+## 2026-09-07 (EDT)
+
+### Guarded publication preparation
+
+- Rediscovered the active Neovim checkout and adjacent Claude project
+  conversation, then reviewed the complete Python source, tests, documentation,
+  dependency changes, working-tree diff, and relevant Git history.
+- The saved implementation and the visible conversation agree on the current
+  direction: the project now has a PyMatching MWPM baseline over Stim detector
+  samples, while a neural-network decoder and a probability threshold sweep
+  remain future work.
+- Applied only mechanical repository-quality corrections: organized imports and
+  formatted `circuit.py`, `shots.py`, and `viz.py`, then narrowed the diagram
+  argument to Stim's supported literal kinds. Experiment parameters, sampling,
+  decoding, and printed results were not changed.
+- Updated the README to describe the implemented MWPM experiment, diagram
+  helper, packaging test, dependencies, resource demands, and current
+  limitations. Removed the stale lint/type-check limitation after the mechanical
+  corrections passed validation.
+
+### Validation of the prepared snapshot
+
+- `uv lock --check` — passed with a task-specific cache; resolved 21 packages.
+- `ruff check --no-cache src tests` — passed.
+- `ruff format --check --no-cache src tests` — passed; all 5 Python files are
+  formatted.
+- `basedpyright` — passed with 0 errors, warnings, or notes.
+- `pytest -q -p no:cacheprovider` — passed, 2 tests.
+- A ten-shot distance-3 API smoke — passed. Detector, observable, and decoded
+  prediction shapes were `(10, 24)`, `(10, 1)`, and `(10, 1)`; a timeline SVG
+  was written under `/tmp` with browser opening disabled.
+- `git diff --check` — passed.
+- Credential-pattern and large-file scans of the eight intended files — passed;
+  no suspected secret pattern was found and no intended file exceeds 1 MiB.
+- The full three-million-shot module run was not repeated because it is
+  stochastic and comparatively memory-intensive. The earlier interactive
+  exploratory results remain recorded separately and are not treated as this
+  review's validation.
+- The local `main` branch still has no configured upstream. The existing remote
+  is the public `choppakatlakoushik001/neural-network` repository on GitHub;
+  its `main` branch matched local `HEAD` before publication.
+- No files were staged, committed, or pushed during preparation.
+
+## 2026-09-08 (EDT)
+
+### Per-round normalization and suppression ratios
+
+- Extended `shots.py` to divide each distance's logical error rate per shot by
+  the number of syndrome rounds, collect the normalized per-round rates, and
+  print the adjacent ratios for distances 3 to 5 and 5 to 7 as suppression
+  factors.
+- This remains a descriptive calculation at the single saved probability
+  `p = 0.005`; it does not determine a threshold or add uncertainty estimates.
+- The adjacent Claude conversation frames a reusable measurement function as
+  the next design step. Whether rounds remain tied to distance, results return
+  as a bare rate or a self-describing record, and sampling stays fixed or
+  becomes adaptive are unresolved decisions and are not implemented here.
+
+### Publication validation
+
+- `uv lock --check --offline` — passed; resolved 21 packages.
+- `ruff check --no-cache src tests` — passed.
+- `ruff format --check --no-cache src tests` — passed; all 5 Python files are
+  formatted.
+- `basedpyright` — passed with 0 errors, warnings, or notes.
+- `pytest -q -p no:cacheprovider` — passed, 2 tests.
+- A ten-shot distance-3 API smoke — passed. Detector, observable, and decoded
+  prediction shapes were `(10, 24)`, `(10, 1)`, and `(10, 1)`.
+- Credential-pattern and large-file scans of the eight intended files — passed;
+  no suspected secret assignment or private-key marker was found, and no
+  intended file exceeds 1 MiB.
+- The full three-million-shot module run was skipped because it is stochastic
+  and comparatively memory-intensive.
+- The `no-mistakes` pipeline remains unavailable because this repository has
+  not been initialized for it; no initialization was performed during review.

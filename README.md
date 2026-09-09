@@ -1,67 +1,105 @@
 # neural-network-qec
 
-An early research scaffold for studying neural-network decoders for quantum
-error correction.
-The current saved implementation does not yet contain a neural network or a
-decoder.
-It builds configurable Stim rotated surface-code memory circuits and samples
-their detector events.
+An early research scaffold for studying decoders for quantum error correction.
+The current implementation does not yet contain a neural network. It builds
+configurable Stim rotated surface-code memory circuits, samples detector events
+and logical observables, and evaluates a PyMatching minimum-weight perfect
+matching (MWPM) baseline.
 
 ## Setup
 
-The project requires Python 3.12 and uses `uv` with a locked NumPy and Stim
-environment.
-This checkout keeps its virtual environment outside the OneDrive-synced project
-folder at `~/.venvs/neural-network-qec`.
-The tracked `.envrc` sets that location automatically for `direnv` users; it can
-also be exported manually:
+The project requires Python 3.12 and uses `uv` with locked NumPy, PyMatching,
+and Stim dependencies. This checkout keeps its virtual environment outside the
+OneDrive-synced project folder at `~/.venvs/neural-network-qec`. The tracked
+`.envrc` sets that location automatically for `direnv` users; it can also be
+exported manually:
 
 ```sh
 export UV_PROJECT_ENVIRONMENT=~/.venvs/neural-network-qec
 uv sync --extra dev
 ```
 
-The `dev` extra currently declares pytest only.
-Ruff and basedpyright commands therefore require those tools to be installed
-separately in the environment that runs them.
+The `dev` extra currently declares pytest only. Ruff and basedpyright commands
+therefore require those tools to be available separately in the environment
+that runs them.
 
-## Current usage
+## Current experiment
 
-Run the saved sampling script as a package module:
+Run the saved experiment as a package module:
 
 ```sh
 uv run python -m neural_network_qec.shots
 ```
 
-It constructs a distance-3, three-round rotated memory-Z circuit with a `0.04`
-before-round data-depolarization probability and a `0.01` pre-measurement flip
-probability, then prints five randomly sampled detector-event rows.
+The module sweeps code distances 3, 5, and 7, with the number of syndrome
+rounds set equal to the distance. It assigns `p = 0.005` to all four configured
+Stim noise controls:
 
-The same behavior is available as a Python API:
+- `before_round_data_depolarization`
+- `before_measure_flip_probability`
+- `after_clifford_depolarization`
+- `after_reset_flip_probability`
+
+For each distance it samples 1,000,000 shots, builds a decomposed detector error
+model, decodes the detector batches with PyMatching, and prints the number of
+observable-prediction mismatches and the raw logical error rate per shot. It
+then divides that rate by the number of rounds, collects the normalized
+per-round rates, and prints the adjacent-distance ratios for distances 3 to 5
+and 5 to 7 as suppression factors. Sampling is unseeded, so the numerical
+results vary between runs.
+
+The same pipeline is available through the Python API:
 
 ```python
+import numpy as np
+import pymatching
+
 from neural_network_qec.circuit import circuit_info
 
 circuit = circuit_info(
     rounds=3,
     distance=3,
-    before_round_data_depolarization=0.04,
-    before_measure_flip_probability=0.01,
+    before_round_data_depolarization=0.005,
+    before_measure_flip_probability=0.005,
+    after_clifford_depolarization=0.005,
+    after_reset_flip_probability=0.005,
 )
-detector_events = circuit.sample_detectors(shots=5)
+detector_events, observables = circuit.sample_detectors(shots=10)
+model = circuit.detector_error_model()
+matcher = pymatching.Matching.from_detector_error_model(model)
+predictions = matcher.decode_batch(detector_events)
+logical_error_rate = np.mean(np.any(predictions != observables, axis=1))
 ```
 
-For this configuration, `detector_events` is a Boolean NumPy array with shape
-`(5, 24)`.
-Sampling is stochastic, so the values change between runs.
+For the distance-3, three-round configuration, ten shots produce Boolean
+detector and observable arrays with shapes `(10, 24)` and `(10, 1)`; PyMatching
+returns predictions with shape `(10, 1)`.
+
+## Circuit diagrams
+
+`circuit_info.circuit_diagram()` renders a Stim diagram to a timestamped SVG or
+HTML file and tries to open it with the platform's browser tooling:
+
+```python
+path = circuit.circuit_diagram(kind="timeline-svg", name="circuit")
+```
+
+Set `QEC_VIZ_NO_OPEN=1` to write without opening a browser, and set
+`QEC_VIZ_DIR` to choose the output directory. Otherwise, output is written
+under a temporary `qec-viz` directory (or the Windows temporary directory when
+it can be resolved from WSL). Generated diagrams are local output and are not
+tracked.
 
 ## Layout
 
 ```text
 src/neural_network_qec/
     __init__.py    package version metadata
-    circuit.py     Stim circuit configuration and detector sampling
-    shots.py       fixed five-shot sampling script
+    circuit.py     Stim circuit, sampling, diagram, and error-model API
+    shots.py       MWPM distance sweep, normalized rates, and suppression ratios
+    viz.py         portable file-based Stim diagram viewer
+tests/
+    test_packaging.py  package and declared-entry-point regression checks
 logs.md            evidence-based development journal
 pyproject.toml     package, dependency, and tool configuration
 uv.lock            reproducible dependency lock
@@ -73,18 +111,22 @@ ignored and are not part of the tracked project snapshot.
 
 ## Current limitations
 
-- The tracked `qec` console entry still targets the removed
-  `neural_network_qec.cli:main` module and does not run.
-- There are currently no tracked tests, so pytest collects no tests.
-- The current source does not pass the configured Ruff lint and format checks.
-- Decoder logic, neural-network training, evaluation, and benchmarking are not
-  implemented yet.
-- `shots.py` runs its fixed sample at module import time and does not accept
-  command-line options.
+- `shots.py` runs at import time, has fixed experiment parameters, and has no
+  command-line interface or reproducible seed.
+- Its default run samples three million shots in total and keeps large batches
+  in memory one distance at a time.
+- The one-probability distance sweep can indicate whether error suppression
+  improves with distance at `p = 0.005`, but its two adjacent-distance ratios
+  cannot locate a threshold. The script does not persist results, compute
+  uncertainty, or generate a threshold plot.
+- The tracked tests cover package/entry-point integrity only; they do not yet
+  test the circuit, decoder, or experiment numerics.
+- Neural-network training, learned decoding, evaluation, and benchmarking
+  against the MWPM baseline are not implemented yet.
 
 ## Offline use
 
-After the locked dependencies are installed, circuit construction and sampling
-work locally.
-A first installation or uncached dependency update needs access to PyPI, and a
-push needs access to GitHub.
+After the locked dependencies are installed, circuit construction, sampling,
+MWPM decoding, and file-based diagram rendering work locally. A first
+installation or uncached dependency update needs access to PyPI, and a push
+needs access to GitHub.
