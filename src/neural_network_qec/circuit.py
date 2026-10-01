@@ -45,9 +45,9 @@ class circuit_info:
             "surface_code:rotated_memory_z",
             rounds=rounds,
             distance=distance,
-            after_clifford_depolarization=after_clifford_depolarization,
             before_round_data_depolarization=before_round_data_depolarization,
             before_measure_flip_probability=before_measure_flip_probability,
+            after_clifford_depolarization=after_clifford_depolarization,
             after_reset_flip_probability=after_reset_flip_probability,
         )
 

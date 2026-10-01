@@ -7,12 +7,14 @@ diagram to a file and opens it in the system browser.
     from neural_network_qec.viz import show
     show(circuit.diagram("timeline-svg"), name="timeline")
 
-Only the standard library is used, so it works on WSL, Linux, macOS and
-Windows. If no opener can be found it prints the path instead of raising --
-looking at a diagram must never be able to fail a script.
+The diagram-viewer path uses only the standard library. If no opener can be
+found it prints the path instead of raising -- looking at a diagram must never
+be able to fail a script. Threshold plotting uses Matplotlib and NumPy.
 
 Set ``QEC_VIZ_NO_OPEN=1`` to write without opening (CI, or batch renders).
 Set ``QEC_VIZ_DIR`` to choose the output directory.
+
+This file also contains threshold-plot helpers.
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ import sys
 import tempfile
 import time
 import webbrowser
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 __all__ = ["show", "source", "outdir"]
 
@@ -163,3 +168,105 @@ def show(obj, name: str = "diagram", open_it: bool = True) -> pathlib.Path:
 
     print(f"viz: {path}" if opened else f"viz: wrote {path} (open it manually)")
     return path
+
+
+# Plotting the threshold
+def threshold_plot(df):
+
+    def find_crossing(df, d_small, d_big):
+        """Physical error rate where the d_small and d_big curves cross.
+
+        Between two neighbouring sweep points each curve is treated as a straight
+        line on the log-log plot, so the crossing is found by linear interpolation
+        of log(p) and log(LER). Returns (p, LER), or None if they never cross.
+        """
+        a = df[df["distance"] == d_small].sort_values("physical_p")
+        b = df[df["distance"] == d_big].sort_values("physical_p")
+        p = a["physical_p"].to_numpy()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            la = np.log(a["LER_per_round"].to_numpy())
+            lb = np.log(b["LER_per_round"].to_numpy())
+        gap = la - lb  # > 0: the smaller code is worse, < 0: it is better
+
+        for i in range(len(p) - 1):
+            if not (np.isfinite(gap[i]) and np.isfinite(gap[i + 1])):
+                continue  # a point with 0 errors has no log, skip it
+            if gap[i] * gap[i + 1] < 0:  # sign flip = the curves crossed here
+                t = gap[i] / (gap[i] - gap[i + 1])
+                log_p = np.log(p[i]) + t * (np.log(p[i + 1]) - np.log(p[i]))
+                log_y = la[i] + t * (la[i + 1] - la[i])
+                return np.exp(log_p), np.exp(log_y)
+        return None
+
+    distances = sorted(df["distance"].unique())
+    crossings = [
+        c
+        for c in (
+            find_crossing(df, d1, d2)
+            for d1, d2 in zip(distances, distances[1:], strict=False)
+        )
+        if c is not None
+    ]
+
+    plt.figure(figsize=(12, 10))
+
+    colors = {3: "#1f77b4", 5: "#2ca02c", 7: "#d62728"}
+
+    for d in sorted(df["distance"].unique()):
+        sub_df = df[df["distance"] == d].sort_values("physical_p")
+
+        plt.plot(
+            sub_df["physical_p"],
+            sub_df["LER_per_round"],
+            marker="o",
+            linestyle="-",
+            color=colors.get(d, "black"),
+            label=f"d={d}",
+        )
+
+    plt.xscale("log")
+    plt.yscale("log")
+
+    if crossings:
+        # One number for the threshold: the geometric mean of the pairwise
+        # crossings (d=3 vs 5, d=5 vs 7), because the axes are logarithmic.
+        p_th = float(np.exp(np.mean([np.log(x) for x, _ in crossings])))
+        y_th = float(np.exp(np.mean([np.log(y) for _, y in crossings])))
+        y_bottom, y_top = plt.ylim()  # remember the axis range before drawing on it
+
+        # A dashed line from the crossing straight down to the x-axis...
+        plt.vlines(
+            p_th,
+            y_bottom,
+            y_th,
+            colors="black",
+            linestyles="--",
+            linewidth=1.2,
+            label=f"threshold  p = {p_th:.4f}",
+        )
+        plt.plot(p_th, y_th, marker="o", color="black", markersize=8, zorder=5)
+        plt.ylim(
+            y_bottom, y_top
+        )  # stop Matplotlib re-scaling, so the line meets the axis
+        # ...and its value written on the axis, just under the tick labels.
+        plt.annotate(
+            f"{p_th:.4f}",
+            xy=(p_th, 0),
+            xycoords=("data", "axes fraction"),
+            xytext=(0, -38),
+            textcoords="offset points",
+            ha="center",
+            fontsize=11,
+            fontweight="bold",
+            arrowprops=dict(arrowstyle="-", color="black", linestyle="--"),
+        )
+        print(f"threshold estimate (curves cross): p = {p_th:.5f}")
+    else:
+        print("no crossing found - widen the sweep range in np.logspace(...)")
+
+    plt.xlabel(r"physical error rate", fontsize=12)
+    plt.ylabel(r"LER_per_round", fontsize=12)
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.legend(title="distance")
+
+    plt.show()

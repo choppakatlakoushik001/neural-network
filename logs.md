@@ -514,3 +514,55 @@ or commands for which no transcript remains.
   and comparatively memory-intensive.
 - The `no-mistakes` pipeline remains unavailable because this repository has
   not been initialized for it; no initialization was performed during review.
+
+## 2026-09-30 (EDT)
+
+### Threshold and Sinter sweeps
+
+- Renamed the direct experiment from `shots.py` to `normal_sweep.py` and
+  expanded it from one physical error rate to nine logarithmically spaced
+  points across distances 3, 5, and 7.
+- Adopted an asymmetric Stim noise model: data and Clifford depolarization use
+  `p`, while measurement and reset flips use `10p`. Each direct-sweep point
+  samples 1,000,000 shots and converts the per-shot logical error rate to an
+  equivalent per-round rate.
+- Added pandas collection and a Matplotlib threshold plot. Adjacent distance
+  curves are interpolated in log space, and their crossings are combined with
+  a geometric mean for the displayed estimate.
+- Added `sinter_sweep.py`, which creates 81 resumable PyMatching tasks spanning
+  three distances, nine probabilities, and round counts `d`, `2d`, and `3d`.
+  It stops each task at 1,000,000 shots or 1,000 errors and writes local results
+  under the ignored `data/` directory.
+- Declared and locked Matplotlib, pandas, and Sinter. The paired Claude review
+  identified two follow-ups that remain unresolved: anchor the Sinter result
+  path to the repository and derive the noise label and filename from one
+  source of truth.
+
+### Publication preparation
+
+- Organized imports, formatted the three edited experiment/plot modules,
+  removed unused Sinter imports and an unused result assignment, and kept the
+  experiment parameters and algorithms unchanged.
+- Updated the README with the implemented direct and adaptive workflows,
+  dependencies, resource costs, output behavior, and current limitations.
+
+### Validation of the prepared snapshot
+
+- `uv lock --check` — passed; resolved 24 packages.
+- `ruff check --no-cache src tests` and `ruff format --check --no-cache src
+  tests` — passed; all 6 Python files are formatted.
+- `basedpyright` — passed with 0 errors, warnings, or notes.
+- `pytest -q -p no:cacheprovider` — passed, 2 packaging tests.
+- A ten-shot asymmetric-noise API smoke — passed with detector, observable,
+  and prediction shapes `(10, 24)`, `(10, 1)`, and `(10, 1)`; diagram output
+  was written under `/tmp` with browser opening disabled.
+- A headless threshold-plot smoke — passed and found a crossing in synthetic
+  data. Matplotlib warned that the Agg backend is non-interactive, as expected.
+- A mocked-collector Sinter smoke — passed; `main()` generated 81 tasks with
+  the documented decoder, shot/error limits, and resume path without running
+  the expensive simulations.
+- `git diff --check` and `git diff --cached --check` — passed.
+- The full 27-million-shot direct sweep and the full Sinter collection were
+  skipped because they are stochastic, compute-intensive research runs.
+- The `no-mistakes` pipeline remains unavailable because this repository has
+  not been initialized for it; no initialization was performed during review.

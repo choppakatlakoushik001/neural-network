@@ -8,11 +8,11 @@ matching (MWPM) baseline.
 
 ## Setup
 
-The project requires Python 3.12 and uses `uv` with locked NumPy, PyMatching,
-and Stim dependencies. This checkout keeps its virtual environment outside the
-OneDrive-synced project folder at `~/.venvs/neural-network-qec`. The tracked
-`.envrc` sets that location automatically for `direnv` users; it can also be
-exported manually:
+The project requires Python 3.12 and uses `uv` with locked Stim, PyMatching,
+Sinter, NumPy, pandas, and Matplotlib dependencies. This checkout keeps its
+virtual environment outside the OneDrive-synced project folder at
+`~/.venvs/neural-network-qec`. The tracked `.envrc` sets that location
+automatically for `direnv` users; it can also be exported manually:
 
 ```sh
 export UV_PROJECT_ENVIRONMENT=~/.venvs/neural-network-qec
@@ -23,30 +23,53 @@ The `dev` extra currently declares pytest only. Ruff and basedpyright commands
 therefore require those tools to be available separately in the environment
 that runs them.
 
-## Current experiment
+## Direct threshold sweep
 
-Run the saved experiment as a package module:
+Run the direct PyMatching sweep as a package module:
 
 ```sh
-uv run python -m neural_network_qec.shots
+uv run python -m neural_network_qec.normal_sweep
 ```
 
-The module sweeps code distances 3, 5, and 7, with the number of syndrome
-rounds set equal to the distance. It assigns `p = 0.005` to all four configured
-Stim noise controls:
+The module evaluates nine logarithmically spaced physical error rates from
+`0.001` through approximately `0.0501` at code distances 3, 5, and 7, with the
+number of syndrome rounds equal to the distance. For each point, it applies
+`p` to data and Clifford depolarization and `10p` to measurement and reset
+flips:
 
 - `before_round_data_depolarization`
 - `before_measure_flip_probability`
 - `after_clifford_depolarization`
 - `after_reset_flip_probability`
 
-For each distance it samples 1,000,000 shots, builds a decomposed detector error
-model, decodes the detector batches with PyMatching, and prints the number of
-observable-prediction mismatches and the raw logical error rate per shot. It
-then divides that rate by the number of rounds, collects the normalized
-per-round rates, and prints the adjacent-distance ratios for distances 3 to 5
-and 5 to 7 as suppression factors. Sampling is unseeded, so the numerical
-results vary between runs.
+For each of the 27 `(p, distance)` points it samples 1,000,000 shots, builds a
+decomposed detector error model, decodes with PyMatching, and measures logical
+observable mismatches. It converts the per-shot logical error rate `L` to the
+equivalent per-round rate
+`0.5 * (1 - (1 - 2L) ** (1 / rounds))`, stores the results in a pandas
+DataFrame, and prints adjacent-distance suppression ratios.
+
+`threshold_plot()` draws the distance curves on log-log axes. It linearly
+interpolates sign changes between adjacent curves in log space and reports the
+geometric mean of the pairwise crossings as the threshold estimate. The sweep
+is unseeded and `plt.show()` opens an interactive plot, so numerical results
+vary between runs and the command requires a graphical Matplotlib backend.
+
+## Adaptive Sinter sweep
+
+The separate Sinter workflow can resume a larger adaptive experiment:
+
+```sh
+uv run python -m neural_network_qec.sinter_sweep
+```
+
+It creates 81 tasks from distances 3, 5, and 7; nine physical error rates from
+`0.001` through approximately `0.0200`; and syndrome-round counts of `d`, `2d`,
+and `3d`. It uses the same asymmetric `p`/`10p` noise model and PyMatching
+decoder, runs with six workers, and stops each task at 1,000,000 shots or 1,000
+logical errors. Progress is resumed into
+`data/sinter_asymmetric_10x.csv`. The `data/` directory is intentionally ignored
+because experiment output can be large.
 
 The same pipeline is available through the Python API:
 
@@ -96,8 +119,9 @@ tracked.
 src/neural_network_qec/
     __init__.py    package version metadata
     circuit.py     Stim circuit, sampling, diagram, and error-model API
-    shots.py       MWPM distance sweep, normalized rates, and suppression ratios
-    viz.py         portable file-based Stim diagram viewer
+    normal_sweep.py  direct MWPM probability sweep and threshold estimate
+    sinter_sweep.py  resumable adaptive Sinter experiment
+    viz.py           Stim diagram viewer and threshold plotting helper
 tests/
     test_packaging.py  package and declared-entry-point regression checks
 logs.md            evidence-based development journal
@@ -111,16 +135,18 @@ ignored and are not part of the tracked project snapshot.
 
 ## Current limitations
 
-- `shots.py` runs at import time, has fixed experiment parameters, and has no
-  command-line interface or reproducible seed.
-- Its default run samples three million shots in total and keeps large batches
-  in memory one distance at a time.
-- The one-probability distance sweep can indicate whether error suppression
-  improves with distance at `p = 0.005`, but its two adjacent-distance ratios
-  cannot locate a threshold. The script does not persist results, compute
-  uncertainty, or generate a threshold plot.
+- `normal_sweep.py` runs at import time, has fixed experiment parameters, and
+  has no command-line interface or reproducible seed.
+- Its default run samples 27 million shots in total and keeps a one-million-shot
+  detector batch in memory for each point. It does not persist the DataFrame or
+  calculate confidence intervals.
+- `sinter_sweep.py` uses a relative results path, so it must be run from the
+  repository root to resume the intended `data/sinter_asymmetric_10x.csv` file.
+- The asymmetric noise-model label and output filename are written separately
+  from the four numerical noise arguments, so future parameter edits must keep
+  them synchronized manually.
 - The tracked tests cover package/entry-point integrity only; they do not yet
-  test the circuit, decoder, or experiment numerics.
+  test the circuit, decoder, threshold interpolation, or experiment numerics.
 - Neural-network training, learned decoding, evaluation, and benchmarking
   against the MWPM baseline are not implemented yet.
 
