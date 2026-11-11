@@ -1,3 +1,11 @@
+"""My direct MWPM baseline before comparing a learned decoder on the same task.
+
+I wrote this loop by hand to understand circuit construction, sampling,
+decoding, and error counting before handing experiment management to Sinter.
+Distance, rounds, and all noise probabilities stay explicit; this saved sweep
+uses asymmetric p/10p noise, not a uniform-noise comparison.
+"""
+
 import numpy as np
 import pandas as pd
 import pymatching
@@ -19,6 +27,8 @@ for p in np.logspace(-3, -1.3, 9):
     for d in range(3, 9, 2):
         print(f" d={d} for p={p} started......")
 
+        # I use d rounds for distance d; measurement/reset flips are 10p,
+        # while data/Clifford depolarization stays at p.
         c = circuit_info(d, d, p, p * 10, p, p * 10)
 
         dets, obs = c.sample_detectors(shots)
@@ -45,7 +55,9 @@ for p in np.logspace(-3, -1.3, 9):
         ler = num_errors / shots
         print(f"LER per shot for d={d} and p={p} is:", ler)
 
-        # normalising LER per round
+        # I convert the final logical parity error into an equivalent per-round
+        # rate, assuming independent identical round flips. This is a model
+        # conversion, not a direct measurement of individual rounds.
         # e = ler / d
         safe_ler_shot = np.clip(ler, 0.0, 0.5)
         e = 0.5 * (1 - (1 - 2 * safe_ler_shot) ** (1 / d))

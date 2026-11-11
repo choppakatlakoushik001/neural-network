@@ -1,5 +1,11 @@
 """Portable viewer for stim diagrams.
 
+I wrote this bridge because my terminal editor runs Python inside WSL, while
+rich diagrams need a browser. Stim returns diagram source; simply returning or
+printing SVG does not display a picture in the terminal. The WSL path writes
+to Windows temporary storage when available and translates the filename before
+opening it, so the Windows browser can read the generated file.
+
 A plain Python script has no display system, so ``print()`` on a stim diagram
 falls back to text. This module supplies the missing half: it renders the
 diagram to a file and opens it in the system browser.
